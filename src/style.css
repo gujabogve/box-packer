@@ -20,6 +20,15 @@ body {
 	font-family: system-ui, sans-serif;
 	background: var(--color-surface);
 	color: var(--color-ink);
-	/* respect iOS safe areas when installed as a PWA */
 	overscroll-behavior: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* On touch screens, keep form controls at 16px so iOS Safari doesn't zoom in on focus. */
+@media (max-width: 1023px) {
+	input,
+	select,
+	textarea {
+		font-size: 16px;
+	}
 }

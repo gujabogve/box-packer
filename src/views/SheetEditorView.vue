@@ -230,8 +230,8 @@ const round = (n: number): number => Math.round(n);
 		</div>
 
 		<template v-else>
-			<!-- Setup / Layout segmented control -->
-			<div class="flex gap-1 border-b border-line p-2">
+			<!-- Setup / Layout segmented control (mobile only; desktop shows both panes) -->
+			<div class="flex gap-1 border-b border-line p-2 lg:hidden">
 				<button
 					v-for="t in ['setup', 'layout'] as const"
 					:key="t"
@@ -243,194 +243,210 @@ const round = (n: number): number => Math.round(n);
 				</button>
 			</div>
 
-			<!-- SETUP -->
-			<div v-show="tab === 'setup'" class="flex-1 overflow-y-auto p-3">
-				<label class="mb-1 block text-xs text-muted">Sheet name</label>
-				<input
-					v-model="sheet.name"
-					type="text"
-					class="mb-4 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-				/>
+			<div class="flex flex-1 flex-col overflow-hidden lg:flex-row">
+				<!-- SETUP -->
+				<div
+					class="flex-col flex-1 overflow-y-auto p-3 lg:flex lg:w-80 lg:flex-none lg:border-r lg:border-line"
+					:class="tab === 'setup' ? 'flex' : 'hidden'"
+				>
+					<label class="mb-1 block text-xs text-muted">Sheet name</label>
+					<input
+						v-model="sheet.name"
+						type="text"
+						class="mb-4 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+					/>
 
-				<div class="mb-1 flex items-center justify-between">
-					<label class="text-xs text-muted">Container (cm)</label>
-					<select class="rounded border border-line bg-surface px-2 py-0.5 text-xs text-muted" @change="applyPreset">
-						<option value="">Preset…</option>
-						<option v-for="(p, i) in PRESETS" :key="p.label" :value="i">{{ p.label }}</option>
-					</select>
-				</div>
-				<div class="mb-4 grid grid-cols-3 gap-2">
-					<div>
-						<span class="text-[11px] text-muted">Width</span>
-						<input
-							v-model.number="sheet.container.w"
-							type="number"
-							min="1"
-							class="w-full rounded-md border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
-						/>
-					</div>
-					<div>
-						<span class="text-[11px] text-muted">Height</span>
-						<input
-							v-model.number="sheet.container.h"
-							type="number"
-							min="1"
-							class="w-full rounded-md border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
-						/>
-					</div>
-					<div>
-						<span class="text-[11px] text-muted">Thickness</span>
-						<select
-							v-model.number="sheet.thickness"
-							class="w-full rounded-md border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
-						>
-							<option v-for="t in thicknessOptions" :key="t" :value="t">{{ t }}mm</option>
+					<div class="mb-1 flex items-center justify-between">
+						<label class="text-xs text-muted">Container (cm)</label>
+						<select class="rounded border border-line bg-surface px-2 py-0.5 text-xs text-muted" @change="applyPreset">
+							<option value="">Preset…</option>
+							<option v-for="(p, i) in PRESETS" :key="p.label" :value="i">{{ p.label }}</option>
 						</select>
 					</div>
-				</div>
-
-				<label class="mb-1 block text-xs text-muted">Pieces (cm)</label>
-				<table class="w-full text-sm">
-					<thead>
-						<tr class="text-left text-[11px] text-muted">
-							<th class="pb-1 font-medium">Name</th>
-							<th class="pb-1 font-medium">W</th>
-							<th class="pb-1 font-medium">H</th>
-							<th class="pb-1 font-medium">Qty</th>
-							<th></th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr v-for="(pc, i) in sheet.pieces" :key="i" class="border-t border-line">
-							<td class="py-1 pr-1">
-								<input
-									v-model="pc.name"
-									type="text"
-									placeholder="Back panel"
-									class="w-full rounded border border-line bg-surface px-2 py-1.5 outline-none focus:border-accent"
-								/>
-							</td>
-							<td class="py-1 pr-1">
-								<input
-									v-model.number="pc.w"
-									type="number"
-									min="1"
-									class="w-14 rounded border border-line bg-surface px-1.5 py-1.5 outline-none focus:border-accent"
-								/>
-							</td>
-							<td class="py-1 pr-1">
-								<input
-									v-model.number="pc.h"
-									type="number"
-									min="1"
-									class="w-14 rounded border border-line bg-surface px-1.5 py-1.5 outline-none focus:border-accent"
-								/>
-							</td>
-							<td class="py-1 pr-1">
-								<input
-									v-model.number="pc.qty"
-									type="number"
-									min="1"
-									class="w-12 rounded border border-line bg-surface px-1.5 py-1.5 outline-none focus:border-accent"
-								/>
-							</td>
-							<td class="py-1 text-right">
-								<button class="px-1 text-[#ff6b6b]" aria-label="Remove" @click="removePiece(i)">×</button>
-							</td>
-						</tr>
-					</tbody>
-				</table>
-				<button
-					class="mt-3 w-full rounded-md border border-line py-2 text-sm text-ink active:border-muted"
-					@click="addPiece"
-				>
-					+ Add piece
-				</button>
-			</div>
-
-			<!-- LAYOUT -->
-			<div v-show="tab === 'layout'" class="flex flex-1 flex-col overflow-hidden">
-				<!-- options bar -->
-				<div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-xs text-muted">
-					<label class="flex items-center gap-1"><input v-model="sheet.options.allowRotate" type="checkbox" /> Rotate</label>
-					<label class="flex items-center gap-1"><input v-model="sheet.options.useKerf" type="checkbox" /> Kerf</label>
-					<input
-						v-if="sheet.options.useKerf"
-						v-model.number="sheet.options.kerf"
-						type="number"
-						step="any"
-						min="0"
-						class="w-16 rounded border border-line bg-surface px-1.5 py-1 outline-none focus:border-accent"
-					/>
-					<label class="flex items-center gap-1"><input v-model="sheet.options.grow" type="checkbox" /> Grow H</label>
-					<button class="ml-auto rounded bg-accent px-3 py-1 font-semibold text-white" @click="repack">Re-pack</button>
-				</div>
-
-				<div v-if="!sheet.pieces.length" class="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted">
-					Add some pieces in the Setup tab first.
-				</div>
-
-				<template v-else>
-					<!-- variant strip -->
-					<div class="flex gap-2 overflow-x-auto border-b border-line p-2">
-						<VariantCard
-							v-for="c in displayCandidates"
-							:key="c.name"
-							:name="c.name"
-							:placed="c.placed"
-							:offcut="c.offcut"
-							:container="sheet.container"
-							:caption="caption(c)"
-							:active="c.name === selectedName"
-							@click="selectByName(c.name)"
-						/>
-						<p v-if="!displayCandidates.length && !packing" class="self-center px-2 text-xs text-muted">No layouts.</p>
-					</div>
-
-					<!-- editable canvas + stats -->
-					<div class="flex-1 overflow-auto p-3">
-						<div v-if="packing" class="flex h-40 items-center justify-center text-sm text-muted">Packing…</div>
-						<PackCanvas
-							v-else
-							ref="packCanvas"
-							:nodes="current"
-							:container="sheet.container"
-							:total-items="totalItems"
-							@stats="onStats"
-							@change="onChange"
-						/>
-
-						<div class="mt-2 text-sm text-muted">
-							Placed <b class="text-ink">{{ stats.placed }}</b
-							>/{{ stats.total }} · Fill <b class="text-ink">{{ stats.fill }}%</b>
-							<span v-if="stats.offcut">
-								· Offcut <b class="text-ink">{{ round(stats.offcut.w) }}×{{ round(stats.offcut.h) }}</b> cm</span
+					<div class="mb-4 grid grid-cols-3 gap-2">
+						<div>
+							<span class="text-[11px] text-muted">Width</span>
+							<input
+								v-model.number="sheet.container.w"
+								type="number"
+								min="1"
+								class="w-full rounded-md border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
+							/>
+						</div>
+						<div>
+							<span class="text-[11px] text-muted">Height</span>
+							<input
+								v-model.number="sheet.container.h"
+								type="number"
+								min="1"
+								class="w-full rounded-md border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
+							/>
+						</div>
+						<div>
+							<span class="text-[11px] text-muted">Thickness</span>
+							<select
+								v-model.number="sheet.thickness"
+								class="w-full rounded-md border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent"
 							>
-						</div>
-						<p class="text-[11px] text-muted/60">drag to move · double-tap to rotate · snaps to edges</p>
-
-						<div v-if="overflow.length" class="mt-2 rounded-md border border-[#ffb454] p-2 text-xs text-[#ffb454]">
-							{{ overflow.length }} piece(s) didn't fit.
-							<button class="ml-1 font-semibold underline" @click="moveOverflow">Move to a new sheet →</button>
+								<option v-for="t in thicknessOptions" :key="t" :value="t">{{ t }}mm</option>
+							</select>
 						</div>
 					</div>
 
-					<!-- action bar -->
-					<div class="flex flex-col gap-1 border-t border-line p-3">
-						<div class="flex gap-2">
-							<button
-								class="flex-1 rounded-md border border-line py-2.5 text-sm active:border-muted"
-								@click="packCanvas?.rotateSelected()"
-							>
-								Rotate selected
-							</button>
-							<button class="flex-1 rounded-md bg-accent py-2.5 text-sm font-semibold text-white" @click="save">
-								Save layout
-							</button>
-						</div>
-						<p v-if="note" class="text-center text-xs text-[#3ddc84]">{{ note }}</p>
+					<label class="mb-1 block text-xs text-muted">Pieces (cm)</label>
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="text-left text-[11px] text-muted">
+								<th class="pb-1 font-medium">Name</th>
+								<th class="pb-1 font-medium">W</th>
+								<th class="pb-1 font-medium">H</th>
+								<th class="pb-1 font-medium">Qty</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="(pc, i) in sheet.pieces" :key="i" class="border-t border-line">
+								<td class="py-1 pr-1">
+									<input
+										v-model="pc.name"
+										type="text"
+										placeholder="Back panel"
+										class="w-full rounded border border-line bg-surface px-2 py-1.5 outline-none focus:border-accent"
+									/>
+								</td>
+								<td class="py-1 pr-1">
+									<input
+										v-model.number="pc.w"
+										type="number"
+										min="1"
+										class="w-14 rounded border border-line bg-surface px-1.5 py-1.5 outline-none focus:border-accent"
+									/>
+								</td>
+								<td class="py-1 pr-1">
+									<input
+										v-model.number="pc.h"
+										type="number"
+										min="1"
+										class="w-14 rounded border border-line bg-surface px-1.5 py-1.5 outline-none focus:border-accent"
+									/>
+								</td>
+								<td class="py-1 pr-1">
+									<input
+										v-model.number="pc.qty"
+										type="number"
+										min="1"
+										class="w-12 rounded border border-line bg-surface px-1.5 py-1.5 outline-none focus:border-accent"
+									/>
+								</td>
+								<td class="py-1 text-right">
+									<button class="px-1 text-[#ff6b6b]" aria-label="Remove" @click="removePiece(i)">×</button>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+					<button
+						class="mt-3 w-full rounded-md border border-line py-2 text-sm text-ink active:border-muted"
+						@click="addPiece"
+					>
+						+ Add piece
+					</button>
+				</div>
+
+				<!-- LAYOUT -->
+				<div class="flex-col flex-1 overflow-hidden lg:flex" :class="tab === 'layout' ? 'flex' : 'hidden'">
+					<!-- options bar -->
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-xs text-muted">
+						<label class="flex items-center gap-1"
+							><input v-model="sheet.options.allowRotate" type="checkbox" /> Rotate</label
+						>
+						<label class="flex items-center gap-1"
+							><input v-model="sheet.options.useKerf" type="checkbox" /> Kerf</label
+						>
+						<input
+							v-if="sheet.options.useKerf"
+							v-model.number="sheet.options.kerf"
+							type="number"
+							step="any"
+							min="0"
+							class="w-16 rounded border border-line bg-surface px-1.5 py-1 outline-none focus:border-accent"
+						/>
+						<label class="flex items-center gap-1"><input v-model="sheet.options.grow" type="checkbox" /> Grow H</label>
+						<button class="ml-auto rounded bg-accent px-3 py-1 font-semibold text-white" @click="repack">
+							Re-pack
+						</button>
 					</div>
-				</template>
+
+					<div
+						v-if="!sheet.pieces.length"
+						class="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted"
+					>
+						Add some pieces in the Setup tab first.
+					</div>
+
+					<template v-else>
+						<!-- variant strip -->
+						<div class="flex gap-2 overflow-x-auto border-b border-line p-2">
+							<VariantCard
+								v-for="c in displayCandidates"
+								:key="c.name"
+								:name="c.name"
+								:placed="c.placed"
+								:offcut="c.offcut"
+								:container="sheet.container"
+								:caption="caption(c)"
+								:active="c.name === selectedName"
+								@click="selectByName(c.name)"
+							/>
+							<p v-if="!displayCandidates.length && !packing" class="self-center px-2 text-xs text-muted">
+								No layouts.
+							</p>
+						</div>
+
+						<!-- editable canvas + stats -->
+						<div class="flex-1 overflow-auto p-3">
+							<div v-if="packing" class="flex h-40 items-center justify-center text-sm text-muted">Packing…</div>
+							<PackCanvas
+								v-else
+								ref="packCanvas"
+								:nodes="current"
+								:container="sheet.container"
+								:total-items="totalItems"
+								@stats="onStats"
+								@change="onChange"
+							/>
+
+							<div class="mt-2 text-sm text-muted">
+								Placed <b class="text-ink">{{ stats.placed }}</b
+								>/{{ stats.total }} · Fill <b class="text-ink">{{ stats.fill }}%</b>
+								<span v-if="stats.offcut">
+									· Offcut <b class="text-ink">{{ round(stats.offcut.w) }}×{{ round(stats.offcut.h) }}</b> cm</span
+								>
+							</div>
+							<p class="text-[11px] text-muted/60">drag to move · double-tap to rotate · snaps to edges</p>
+
+							<div v-if="overflow.length" class="mt-2 rounded-md border border-[#ffb454] p-2 text-xs text-[#ffb454]">
+								{{ overflow.length }} piece(s) didn't fit.
+								<button class="ml-1 font-semibold underline" @click="moveOverflow">Move to a new sheet →</button>
+							</div>
+						</div>
+
+						<!-- action bar -->
+						<div class="flex flex-col gap-1 border-t border-line p-3">
+							<div class="flex gap-2">
+								<button
+									class="flex-1 rounded-md border border-line py-2.5 text-sm active:border-muted"
+									@click="packCanvas?.rotateSelected()"
+								>
+									Rotate selected
+								</button>
+								<button class="flex-1 rounded-md bg-accent py-2.5 text-sm font-semibold text-white" @click="save">
+									Save layout
+								</button>
+							</div>
+							<p v-if="note" class="text-center text-xs text-[#3ddc84]">{{ note }}</p>
+						</div>
+					</template>
+				</div>
 			</div>
 		</template>
 	</div>
