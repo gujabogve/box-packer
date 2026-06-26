@@ -9,9 +9,8 @@ const props = withDefaults(
 		container: { w: number; h: number };
 		totalItems: number;
 		editable?: boolean;
-		maxHeight?: number;
 	}>(),
-	{ editable: true, maxHeight: 460 },
+	{ editable: true },
 );
 
 const emit = defineEmits<{
@@ -279,7 +278,7 @@ watch(
 	<div
 		ref="wrap"
 		class="relative w-full touch-none select-none overflow-hidden rounded-lg border border-line bg-[#0d0f14]"
-		:style="{ height: maxHeight + 'px' }"
+		style="min-height: 200px"
 		@pointerdown="onDown"
 		@pointermove="onMove"
 		@pointerup="onUp"

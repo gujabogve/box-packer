@@ -63,6 +63,7 @@ const current = shallowRef<PackNode[]>([]);
 const selectedName = ref('');
 const edited = ref(false);
 const packing = ref(false);
+const variantsOpen = ref(true);
 const stats = ref<{ placed: number; total: number; fill: number; offcut: Offcut | null }>({
 	placed: 0,
 	total: 0,
@@ -384,30 +385,41 @@ const round = (n: number): number => Math.round(n);
 					</div>
 
 					<template v-else>
-						<!-- variant strip -->
-						<div class="flex gap-2 overflow-x-auto border-b border-line p-2">
-							<VariantCard
-								v-for="c in displayCandidates"
-								:key="c.name"
-								:name="c.name"
-								:placed="c.placed"
-								:offcut="c.offcut"
-								:container="sheet.container"
-								:caption="caption(c)"
-								:active="c.name === selectedName"
-								@click="selectByName(c.name)"
-							/>
-							<p v-if="!displayCandidates.length && !packing" class="self-center px-2 text-xs text-muted">
-								No layouts.
-							</p>
+						<!-- variants (collapsible, to leave room for the canvas) -->
+						<div class="shrink-0 border-b border-line">
+							<button
+								class="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted"
+								@click="variantsOpen = !variantsOpen"
+							>
+								<span class="w-3">{{ variantsOpen ? '▾' : '▸' }}</span>
+								<span>Variants ({{ displayCandidates.length }})</span>
+								<span v-if="selectedName" class="ml-auto truncate pl-2 text-ink">{{ selectedName }}</span>
+							</button>
+							<div v-show="variantsOpen" class="flex gap-2 overflow-x-auto px-2 pb-2">
+								<VariantCard
+									v-for="c in displayCandidates"
+									:key="c.name"
+									:name="c.name"
+									:placed="c.placed"
+									:offcut="c.offcut"
+									:container="sheet.container"
+									:caption="caption(c)"
+									:active="c.name === selectedName"
+									@click="selectByName(c.name)"
+								/>
+								<p v-if="!displayCandidates.length && !packing" class="self-center px-2 text-xs text-muted">
+									No layouts.
+								</p>
+							</div>
 						</div>
 
-						<!-- editable canvas + stats -->
-						<div class="flex-1 overflow-auto p-3">
-							<div v-if="packing" class="flex h-40 items-center justify-center text-sm text-muted">Packing…</div>
+						<!-- editable canvas (fills remaining space) + stats -->
+						<div class="flex min-h-0 flex-1 flex-col p-3">
+							<div v-if="packing" class="flex flex-1 items-center justify-center text-sm text-muted">Packing…</div>
 							<PackCanvas
 								v-else
 								ref="packCanvas"
+								class="min-h-0 flex-1"
 								:nodes="current"
 								:container="sheet.container"
 								:total-items="totalItems"
@@ -415,16 +427,18 @@ const round = (n: number): number => Math.round(n);
 								@change="onChange"
 							/>
 
-							<div class="mt-2 text-sm text-muted">
+							<div class="mt-2 shrink-0 text-sm text-muted">
 								Placed <b class="text-ink">{{ stats.placed }}</b
 								>/{{ stats.total }} · Fill <b class="text-ink">{{ stats.fill }}%</b>
 								<span v-if="stats.offcut">
 									· Offcut <b class="text-ink">{{ round(stats.offcut.w) }}×{{ round(stats.offcut.h) }}</b> cm</span
 								>
 							</div>
-							<p class="text-[11px] text-muted/60">drag to move · double-tap to rotate · snaps to edges</p>
 
-							<div v-if="overflow.length" class="mt-2 rounded-md border border-[#ffb454] p-2 text-xs text-[#ffb454]">
+							<div
+								v-if="overflow.length"
+								class="mt-2 shrink-0 rounded-md border border-[#ffb454] p-2 text-xs text-[#ffb454]"
+							>
 								{{ overflow.length }} piece(s) didn't fit.
 								<button class="ml-1 font-semibold underline" @click="moveOverflow">Move to a new sheet →</button>
 							</div>

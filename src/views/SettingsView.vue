@@ -9,18 +9,12 @@ const note = ref('');
 
 async function exportData(): Promise<void> {
 	json.value = await store.exportAll();
-	await navigator.clipboard?.writeText(json.value).catch(() => {});
-	note.value = 'Exported & copied to clipboard.';
+	await copy();
+	note.value = 'Exported below — copy it somewhere safe.';
 }
 
-function download(): void {
-	const blob = new Blob([json.value || ''], { type: 'application/json' });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = 'box-packer-backup.json';
-	a.click();
-	URL.revokeObjectURL(url);
+async function copy(): Promise<void> {
+	if (json.value) await navigator.clipboard?.writeText(json.value).catch(() => {});
 }
 
 async function importData(): Promise<void> {
@@ -47,21 +41,22 @@ async function clearAll(): Promise<void> {
 		<div class="flex-1 overflow-y-auto p-3">
 			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Backup</h2>
 			<p class="mb-2 text-xs text-muted">
-				All data lives on this device. Export to back up or move to another device.
+				All data lives on this device. <b class="text-ink">Export</b> dumps every project as JSON into the box below —
+				copy it to back up or move to another device. To restore, paste JSON in and <b class="text-ink">Import</b>.
 			</p>
 			<div class="mb-2 flex gap-2">
 				<button class="flex-1 rounded-md bg-accent py-2 text-sm font-semibold text-white" @click="exportData">
-					Export
+					Export ↓
 				</button>
-				<button class="flex-1 rounded-md border border-line py-2 text-sm" @click="download">Download .json</button>
+				<button class="flex-1 rounded-md border border-line py-2 text-sm" @click="copy">Copy</button>
 			</div>
 			<textarea
 				v-model="json"
 				spellcheck="false"
-				placeholder="Paste a backup here, then Import…"
-				class="h-40 w-full resize-y rounded-md border border-line bg-surface p-2 font-mono text-xs outline-none focus:border-accent"
+				placeholder="Exported JSON appears here. Or paste a backup to Import…"
+				class="h-48 w-full resize-y rounded-md border border-line bg-surface p-2 font-mono text-xs outline-none focus:border-accent"
 			></textarea>
-			<button class="mt-2 w-full rounded-md border border-line py-2 text-sm" @click="importData">Import</button>
+			<button class="mt-2 w-full rounded-md border border-line py-2 text-sm" @click="importData">Import ↑</button>
 
 			<p v-if="note" class="mt-3 text-xs text-[#ffb454]">{{ note }}</p>
 
