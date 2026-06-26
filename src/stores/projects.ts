@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { db } from '../db';
-import { defaultOptions, type Project, type Sheet } from '../lib/types';
+import { defaultOptions, type Project, type SavedPlacement } from '../lib/types';
+import { planProject } from '../lib/methods';
 
 function uid(): string {
 	return crypto.randomUUID();
@@ -42,6 +43,11 @@ export const useProjectsStore = defineStore('projects', () => {
 			name: name.trim() || 'Untitled',
 			createdAt: Date.now(),
 			updatedAt: Date.now(),
+			parts: [],
+			container: { w: 122, h: 244 },
+			thickness: 15,
+			options: defaultOptions(),
+			quantity: 1,
 			sheets: [],
 		};
 		projects.value.unshift(p);
@@ -63,22 +69,21 @@ export const useProjectsStore = defineStore('projects', () => {
 		await db.projects.delete(id);
 	}
 
-	async function addSheet(projectId: string, init: Partial<Sheet> = {}): Promise<Sheet | null> {
+	// Regenerate the whole sheet set for a project (multi-bin pack of quantity × parts).
+	// Returns the number of parts too big to fit any board.
+	async function generate(projectId: string): Promise<number> {
 		const p = projects.value.find((x) => x.id === projectId);
-		if (!p) return null;
-		const sheet: Sheet = {
+		if (!p) return 0;
+		const { sheets, leftover } = planProject(p);
+		p.sheets = sheets.map((s, i) => ({
 			id: uid(),
-			name: init.name ?? `Sheet ${p.sheets.length + 1}`,
-			container: init.container ?? { w: 122, h: 244 },
-			thickness: init.thickness ?? 15,
-			options: init.options ?? defaultOptions(),
-			pieces: init.pieces ?? [],
-			savedLayout: init.savedLayout ?? null,
-			savedMethod: init.savedMethod ?? null,
-		};
-		p.sheets.push(sheet);
+			name: `Sheet ${i + 1}`,
+			pieces: s.pieces,
+			savedLayout: s.placed as SavedPlacement[],
+			savedMethod: 'Auto',
+		}));
 		await persist(projectId);
-		return sheet;
+		return leftover;
 	}
 
 	async function deleteSheet(projectId: string, sheetId: string): Promise<void> {
@@ -88,13 +93,13 @@ export const useProjectsStore = defineStore('projects', () => {
 		await persist(projectId);
 	}
 
-	function getSheet(projectId: string, sheetId: string): Sheet | null {
+	function getSheet(projectId: string, sheetId: string) {
 		const p = projects.value.find((x) => x.id === projectId);
 		return p?.sheets.find((s) => s.id === sheetId) ?? null;
 	}
 
 	async function exportAll(): Promise<string> {
-		return JSON.stringify({ version: 1, projects: snapshot(projects.value) }, null, 2);
+		return JSON.stringify({ version: 2, projects: snapshot(projects.value) }, null, 2);
 	}
 
 	async function importAll(json: string): Promise<void> {
@@ -121,7 +126,7 @@ export const useProjectsStore = defineStore('projects', () => {
 		createProject,
 		renameProject,
 		deleteProject,
-		addSheet,
+		generate,
 		deleteSheet,
 		getSheet,
 		exportAll,

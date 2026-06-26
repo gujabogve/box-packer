@@ -1,10 +1,12 @@
-// Domain model persisted to IndexedDB. Project → Sheet → Piece.
+// Domain model. A Project IS a product (e.g. a chair). It owns the part list (BOM), one board
+// spec, and a target quantity; its sheets are auto-generated, editable cut layouts.
 
 export interface Piece {
 	name: string;
 	w: number;
 	h: number;
 	qty: number;
+	color?: string;
 }
 
 export interface SheetOptions {
@@ -14,8 +16,7 @@ export interface SheetOptions {
 	kerf: number;
 }
 
-// One placed piece in a saved (auto-picked or hand-tweaked) layout.
-// Mirrors the packer's PackNode so save/restore is a plain clone.
+// One placed piece in a saved layout. Mirrors the packer's PackNode so save/restore is a plain clone.
 export interface SavedPlacement {
 	x: number;
 	y: number;
@@ -28,12 +29,10 @@ export interface SavedPlacement {
 	rot: boolean;
 }
 
+// A generated board: the parts assigned to it + its saved layout. Board size/options come from the project.
 export interface Sheet {
 	id: string;
 	name: string;
-	container: { w: number; h: number };
-	thickness: number;
-	options: SheetOptions;
 	pieces: Piece[];
 	savedLayout: SavedPlacement[] | null;
 	savedMethod: string | null;
@@ -45,7 +44,12 @@ export interface Project {
 	notes?: string;
 	createdAt: number;
 	updatedAt: number;
-	sheets: Sheet[];
+	parts: Piece[]; // the product's bill of materials (per single product)
+	container: { w: number; h: number }; // board size — one per project
+	thickness: number;
+	options: SheetOptions;
+	quantity: number; // how many products to make
+	sheets: Sheet[]; // generated layouts
 }
 
 export function defaultOptions(): SheetOptions {

@@ -31,9 +31,8 @@ function remove(p: Project): void {
 }
 
 function summary(p: Project): string {
-	const boards = p.sheets.length;
-	const pieces = p.sheets.reduce((s, sh) => s + sh.pieces.reduce((a, pc) => a + (pc.qty || 0), 0), 0);
-	return `${boards} sheet${boards === 1 ? '' : 's'} · ${pieces} piece${pieces === 1 ? '' : 's'}`;
+	const sheets = p.sheets.length;
+	return `${p.parts.length} part${p.parts.length === 1 ? '' : 's'} · ×${p.quantity} · ${sheets} sheet${sheets === 1 ? '' : 's'}`;
 }
 </script>
 

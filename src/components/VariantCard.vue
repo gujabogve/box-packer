@@ -16,7 +16,16 @@ const cv = ref<HTMLCanvasElement | null>(null);
 
 function render(): void {
 	if (cv.value)
-		renderLayout(cv.value, props.placed, props.offcut, Math.max(1, props.container.w), Math.max(1, props.container.h), 150, 104, false);
+		renderLayout(
+			cv.value,
+			props.placed,
+			props.offcut,
+			Math.max(1, props.container.w),
+			Math.max(1, props.container.h),
+			150,
+			104,
+			false,
+		);
 }
 
 onMounted(render);

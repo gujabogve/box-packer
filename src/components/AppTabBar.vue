@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const tabs = [
 	{ to: '/projects', label: 'Projects', icon: '▣' },
-	{ to: '/sheets', label: 'Sheets', icon: '▤' },
+	{ to: '/sheets', label: 'Product', icon: '▤' },
 	{ to: '/settings', label: 'Settings', icon: '⚙' },
 ];
 </script>

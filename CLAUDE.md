@@ -27,18 +27,21 @@ side by side and lets you hand-tweak the result, then save the one you like.
 - `pnpm deploy` — `pnpm build && gh-pages -d dist` → publishes to the `gh-pages` branch (GitHub Pages).
 - `node scripts/gen-icons.mjs` — regenerate the PWA icons.
 
-## Data model — Project → Sheet → Piece
+## Data model — Project (= product) → Sheets → Parts
 
-- **Project** — a piece of furniture (e.g. "Dining Chair"); holds several sheets.
-- **Sheet** — one plywood board: named, `container` size, `thickness`, options, pieces, and a saved layout.
-- **Piece** — a named cut rectangle (`name`, `w`, `h`, `qty`).
-- One Dexie object store (`projects`), each a document with nested sheets. Export/import JSON for backup.
-- **Units: cm** for board + piece dimensions, **mm** for thickness (default 15). Sheet presets: `122×244`, `152×152`.
+- **Project = one product** (e.g. a chair). Owns the **parts** (BOM, per single product), one **board**
+  spec (`container` size + `thickness` + `options`), and a target **quantity**.
+- **Sheet** — an auto-generated, editable cut layout: its assigned `pieces` + a saved layout. Board
+  size/options come from the project (one board per project, no mixing products on a sheet).
+- **Piece** — a named cut rectangle (`name`, `w`, `h`, `qty`, optional `color`).
+- One Dexie object store (`projects`); v2 cleared the old v1 per-sheet data. Export/import JSON for backup.
+- **Units: cm** for dimensions, **mm** for thickness (default 15). Board presets: `122×244`, `152×152`.
 
 ## Layout / navigation
 
-- Bottom tab bar: **Projects / Sheets / Settings**. Sheets tab = the active project's detail (switch
-  via the header dropdown). A sheet opens the editor with a **Setup / Layout** segmented control.
+- Bottom tab bar: **Projects / Product / Settings**. Projects lists products; **Product** = the active
+  product's setup (parts + board + quantity + Generate) and its generated sheets; tapping a sheet opens
+  the layout editor (variants + editable canvas + save).
 
 ## Key concepts
 
@@ -48,10 +51,12 @@ side by side and lets you hand-tweak the result, then save the one you like.
   - **Compact** — MaxRects + corner compaction (densest).
   - **Gap-fill** — Compact, then lifts stranded pieces to free an edge strip.
   - **Rows / Columns** — shelf packing; leaves a full-width / full-height strip.
+- **Generate** — `planSheets` multi-bin packs `quantity × parts` across as many boards as needed.
+- **Auto-fill** — `maxProductsPerBoard` reports how many whole products fit on one board.
 - **Save layout** — store the picked or hand-edited arrangement (method = `Manual` if edited). On reopen
   the variants regenerate and the saved layout is pinned first.
-- **Overflow** — if pieces don't fit, "Move to a new sheet" creates a sibling sheet with the leftovers.
 - **Manual edit** — drag pieces (snaps to edges), double-tap / double-click to rotate; offcut recomputes live.
+- **Zoom/pan** — pinch or −/Fit/+ on the canvas; one finger drags a piece, empty-space drag pans.
 - **Saw kerf** (optional) — per-piece blade-width margin so cut sizes stay accurate.
 
 ## Project structure
