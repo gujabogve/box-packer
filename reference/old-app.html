@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>2D Box Packer</title>
+<style>
+	:root {
+		--bg: #0f1115;
+		--panel: #171a21;
+		--line: #2a2f3a;
+		--text: #e6e9ef;
+		--muted: #8b93a3;
+		--accent: #4f9dff;
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		font-family: system-ui, sans-serif;
+		background: var(--bg);
+		color: var(--text);
+		display: flex;
+		min-height: 100vh;
+	}
+	aside {
+		width: 320px;
+		flex-shrink: 0;
+		background: var(--panel);
+		border-right: 1px solid var(--line);
+		padding: 16px;
+		overflow-y: auto;
+	}
+	main {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 16px;
+		gap: 12px;
+	}
+	h1 { font-size: 16px; margin: 0 0 12px; }
+	h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 8px; }
+	label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+	input[type="number"], input[type="text"] {
+		width: 100%;
+		background: #0d0f14;
+		border: 1px solid var(--line);
+		color: var(--text);
+		border-radius: 6px;
+		padding: 7px 9px;
+		font-size: 13px;
+	}
+	.row { display: flex; gap: 8px; margin-bottom: 10px; }
+	.row > div { flex: 1; }
+	button {
+		background: var(--accent);
+		border: none;
+		color: #fff;
+		padding: 8px 12px;
+		border-radius: 6px;
+		font-size: 13px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+	button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+	button:hover { filter: brightness(1.1); }
+	table { width: 100%; border-collapse: collapse; font-size: 12px; }
+	th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
+	th { color: var(--muted); font-weight: 500; }
+	td input { width: 56px; padding: 3px 5px; font-size: 12px; }
+	.del { color: #ff6b6b; cursor: pointer; background: none; border: none; font-size: 14px; padding: 0; }
+	.opts { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 6px 0; }
+	canvas { background: #0d0f14; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
+	#compare { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+	.card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 5px;
+		padding: 6px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		cursor: pointer;
+		background: #12151c;
+	}
+	.card:hover { border-color: var(--muted); }
+	.card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+	.card canvas { border: none; }
+	.cap { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--muted); line-height: 1.4; }
+	.cap b { color: var(--text); font-size: 12px; }
+	.stats { font-size: 13px; color: var(--muted); }
+	.stats b { color: var(--text); }
+	.warn { color: #ffb454; font-size: 12px; }
+</style>
+</head>
+<body>
+<aside>
+	<h1>2D Box Packer</h1>
+
+	<h2>Container</h2>
+	<div class="row">
+		<div><label>Width</label><input type="number" id="cw" value="800" min="0" step="any" /></div>
+		<div><label>Height</label><input type="number" id="ch" value="600" min="0" step="any" /></div>
+	</div>
+
+	<h2>Boxes</h2>
+	<table id="tbl">
+		<thead><tr><th>W</th><th>H</th><th>Qty</th><th></th></tr></thead>
+		<tbody></tbody>
+	</table>
+	<div class="row" style="margin-top:8px">
+		<button class="ghost" id="add" style="flex:1">+ Add box</button>
+	</div>
+
+	<div class="opts">
+		<input type="checkbox" id="rotate" checked />
+		<label for="rotate" style="margin:0">Allow 90° rotation</label>
+	</div>
+	<div class="opts">
+		<input type="checkbox" id="grow" />
+		<label for="grow" style="margin:0">Auto-grow container height to fit all</label>
+	</div>
+	<div class="opts">
+		<input type="checkbox" id="usekerf" />
+		<label for="usekerf" style="margin:0">Saw kerf</label>
+		<input type="number" id="kerf" value="0.3" step="any" min="0" style="width:64px" />
+	</div>
+
+	<div class="row" style="margin-top:14px">
+		<button id="pack" style="flex:1">Pack</button>
+	</div>
+	<div id="msg" class="warn"></div>
+
+	<h2>JSON</h2>
+	<textarea id="json" spellcheck="false" placeholder='{"container":{"w":122,"h":244},"boxes":[{"w":40,"h":77,"qty":1}]}'
+		style="width:100%;height:120px;background:#0d0f14;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px;font-family:monospace;font-size:12px;resize:vertical"></textarea>
+	<div class="row" style="margin-top:8px">
+		<button class="ghost" id="loadJson" style="flex:1">Load</button>
+		<button class="ghost" id="copyJson" style="flex:1">Copy current</button>
+	</div>
+</aside>
+
+<main>
+	<div id="compare"></div>
+	<canvas id="cv" width="800" height="600"></canvas>
+	<div class="stats" id="stats"></div>
+	<div class="stats" style="opacity:.55;font-size:11px">drag to move · double-click to rotate · snaps to edges · Pack resets</div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const tbody = $("tbl").querySelector("tbody");
+
+let lastResult = null, lastTotal = 0;
+let candidates = [], selected = 0;
+const view = { scale: 1, W: 0, H: 0 };
+
+let boxes = [
+	{ w: 200, h: 150, qty: 3 },
+	{ w: 120, h: 300, qty: 2 },
+	{ w: 80, h: 80, qty: 6 },
+];
+
+function renderRows() {
+	tbody.innerHTML = "";
+	boxes.forEach((b, i) => {
+		const tr = document.createElement("tr");
+		tr.innerHTML =
+			`<td><input type="number" min="0" step="any" value="${b.w}" data-i="${i}" data-k="w"></td>` +
+			`<td><input type="number" min="0" step="any" value="${b.h}" data-i="${i}" data-k="h"></td>` +
+			`<td><input type="number" min="1" step="1" value="${b.qty}" data-i="${i}" data-k="qty"></td>` +
+			`<td><button class="del" data-i="${i}">×</button></td>`;
+		tbody.appendChild(tr);
+	});
+	tbody.querySelectorAll("input").forEach(inp => {
+		inp.oninput = e => {
+			const { i, k } = e.target.dataset;
+			const v = parseFloat(e.target.value);
+			boxes[i][k] = k === "qty" ? Math.max(1, parseInt(e.target.value) || 1) : (v > 0 ? v : 0);
+		};
+	});
+	tbody.querySelectorAll(".del").forEach(btn => {
+		btn.onclick = e => { boxes.splice(+e.target.dataset.i, 1); renderRows(); };
+	});
+}
+
+$("add").onclick = () => { boxes.push({ w: 100, h: 100, qty: 1 }); renderRows(); };
+
+// MaxRects packing (Best Short Side Fit). Returns placements + leftovers.
+function pack(items, W, H, allowRotate) {
+	let free = [{ x: 0, y: 0, w: W, h: H }];
+	const placed = [];
+	const unplaced = [];
+
+	for (const it of items) {
+		let best = null;
+		for (let fi = 0; fi < free.length; fi++) {
+			const f = free[fi];
+			// no rotation
+			if (it.w <= f.w && it.h <= f.h) {
+				const leftover = Math.min(f.w - it.w, f.h - it.h);
+				if (!best || leftover < best.score) best = { fi, w: it.w, h: it.h, x: f.x, y: f.y, score: leftover, rot: false };
+			}
+			// rotated
+			if (allowRotate && it.h <= f.w && it.w <= f.h) {
+				const leftover = Math.min(f.w - it.h, f.h - it.w);
+				if (!best || leftover < best.score) best = { fi, w: it.h, h: it.w, x: f.x, y: f.y, score: leftover, rot: true };
+			}
+		}
+		if (!best) { unplaced.push(it); continue; }
+
+		const node = { x: best.x, y: best.y, w: best.w, h: best.h, rw: best.rot ? it.rh : it.rw, rh: best.rot ? it.rw : it.rh, color: it.color, label: it.label, rot: best.rot };
+		placed.push(node);
+
+		// split all free rects that overlap the placed node
+		const next = [];
+		for (const f of free) {
+			if (node.x >= f.x + f.w || node.x + node.w <= f.x || node.y >= f.y + f.h || node.y + node.h <= f.y) {
+				next.push(f);
+				continue;
+			}
+			if (node.x > f.x) next.push({ x: f.x, y: f.y, w: node.x - f.x, h: f.h });
+			if (node.x + node.w < f.x + f.w) next.push({ x: node.x + node.w, y: f.y, w: f.x + f.w - (node.x + node.w), h: f.h });
+			if (node.y > f.y) next.push({ x: f.x, y: f.y, w: f.w, h: node.y - f.y });
+			if (node.y + node.h < f.y + f.h) next.push({ x: f.x, y: node.y + node.h, w: f.w, h: f.y + f.h - (node.y + node.h) });
+		}
+		// prune contained rects
+		free = next.filter((a, i) =>
+			!next.some((b, j) => i !== j && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h)
+		);
+	}
+	return { placed, unplaced };
+}
+
+const palette = ["#4f9dff", "#ff7a59", "#46c896", "#c084fc", "#ffd166", "#ef476f", "#06d6a0", "#f78c6b"];
+
+// Usefulness of an offcut: raw area, bonus if it spans the full width or height (clean strip).
+const SPAN_BONUS = 1.2;
+function offcutScore(r, W, H) {
+	let s = r.w * r.h;
+	if (r.w >= W - 1e-6) s *= SPAN_BONUS;
+	if (r.h >= H - 1e-6) s *= SPAN_BONUS;
+	return s;
+}
+
+// Best empty axis-aligned rectangle (by offcutScore) via coordinate compression + histogram scan.
+function largestEmptyRect(placed, W, H) {
+	const xs = [...new Set([0, W, ...placed.flatMap(p => [p.x, p.x + p.w]).filter(v => v > 0 && v < W)])].sort((a, b) => a - b);
+	const ys = [...new Set([0, H, ...placed.flatMap(p => [p.y, p.y + p.h]).filter(v => v > 0 && v < H)])].sort((a, b) => a - b);
+	const nx = xs.length - 1, ny = ys.length - 1;
+	if (nx < 1 || ny < 1) return null;
+	const cw = xs.slice(1).map((v, i) => v - xs[i]);
+	const ch = ys.slice(1).map((v, i) => v - ys[i]);
+	const occ = (i, j) => {
+		const cx = (xs[i] + xs[i + 1]) / 2, cy = (ys[j] + ys[j + 1]) / 2;
+		return placed.some(p => cx > p.x && cx < p.x + p.w && cy > p.y && cy < p.y + p.h);
+	};
+	const height = new Array(nx).fill(0); // free height (real units) ending at current row
+	let best = null, bestScore = -1;
+	for (let j = 0; j < ny; j++) {
+		for (let i = 0; i < nx; i++) height[i] = occ(i, j) ? 0 : height[i] + ch[j];
+		const rowBottom = ys[j + 1];
+		for (let i = 0; i < nx; i++) {
+			let minH = Infinity, width = 0;
+			for (let k = i; k < nx; k++) {
+				minH = Math.min(minH, height[k]);
+				if (minH === 0) break;
+				width += cw[k];
+				const r = { x: xs[i], y: rowBottom - minH, w: width, h: minH, area: minH * width };
+				const sc = offcutScore(r, W, H);
+				if (sc > bestScore) { bestScore = sc; best = r; }
+			}
+		}
+	}
+	return best;
+}
+
+const SORTS = [
+	(a, b) => b.h - a.h || b.w - a.w,                 // tallest first
+	(a, b) => b.w - a.w || b.h - a.h,                 // widest first
+	(a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h),// longest side first
+	(a, b) => b.w * b.h - a.w * a.h,                  // largest area first
+];
+
+// Slide every piece as far as possible along one axis to close internal gaps.
+// axis: 'x' or 'y'; toMax: push toward the far edge (limit) instead of toward 0.
+function slide(placed, axis, toMax, limit) {
+	const s = axis === "x" ? "w" : "h";
+	const o = axis === "x" ? "y" : "x";
+	const os = axis === "x" ? "h" : "w";
+	const order = [...placed].sort((a, b) => toMax ? (b[axis] + b[s]) - (a[axis] + a[s]) : a[axis] - b[axis]);
+	for (const p of order) {
+		const overlaps = q => q !== p && q[o] < p[o] + p[os] && q[o] + q[os] > p[o];
+		if (!toMax) {
+			let np = 0;
+			for (const q of placed) if (overlaps(q) && q[axis] + q[s] <= p[axis] + 1e-9) np = Math.max(np, q[axis] + q[s]);
+			p[axis] = np;
+		} else {
+			let np = limit - p[s];
+			for (const q of placed) if (overlaps(q) && q[axis] >= p[axis] + p[s] - 1e-9) np = Math.min(np, q[axis] - p[s]);
+			p[axis] = np;
+		}
+	}
+}
+
+const clone = a => a.map(p => ({ ...p }));
+
+// Remaining free rectangles of a layout (same split/prune as the packer).
+function freeRects(placed, W, H) {
+	let free = [{ x: 0, y: 0, w: W, h: H }];
+	for (const node of placed) {
+		const next = [];
+		for (const f of free) {
+			if (node.x >= f.x + f.w || node.x + node.w <= f.x || node.y >= f.y + f.h || node.y + node.h <= f.y) { next.push(f); continue; }
+			if (node.x > f.x) next.push({ x: f.x, y: f.y, w: node.x - f.x, h: f.h });
+			if (node.x + node.w < f.x + f.w) next.push({ x: node.x + node.w, y: f.y, w: f.x + f.w - (node.x + node.w), h: f.h });
+			if (node.y > f.y) next.push({ x: f.x, y: f.y, w: f.w, h: node.y - f.y });
+			if (node.y + node.h < f.y + f.h) next.push({ x: f.x, y: node.y + node.h, w: f.w, h: f.y + f.h - (node.y + node.h) });
+		}
+		free = next.filter((a, i) => !next.some((b, j) => i !== j && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h));
+	}
+	return free;
+}
+
+// #2: lift the deepest pieces into higher gaps so a clean edge strip can open up.
+function gapFill(placed, W, H) {
+	for (let guard = 0; guard < 40; guard++) {
+		const free = freeRects(placed, W, H);
+		const order = [...placed].sort((a, b) => (b.y + b.h) - (a.y + a.h));
+		let moved = false;
+		for (const p of order) {
+			let target = null;
+			for (const f of free) {
+				if (f.w >= p.w - 1e-9 && f.h >= p.h - 1e-9 && f.y + p.h < p.y + p.h - 1e-9) {
+					if (!target || f.y < target.y) target = f;
+				}
+			}
+			if (target) { p.x = target.x; p.y = target.y; moved = true; break; }
+		}
+		if (!moved) break;
+	}
+}
+
+// Orientation options for a piece (adds the rotated one when allowed).
+function orients(it, rot) {
+	const a = { w: it.w, h: it.h, rot: false };
+	if (!rot || it.w === it.h) return [a];
+	return [a, { w: it.h, h: it.w, rot: true }];
+}
+function mkNode(it, x, y, o) {
+	return { x, y, w: o.w, h: o.h, rw: o.rot ? it.rh : it.rw, rh: o.rot ? it.rw : it.rh, color: it.color, label: it.label, rot: o.rot };
+}
+
+// MaxRects across all sort orders + corner compaction; optionally gap-fill. Returns best by [placed, offcut].
+function maxrectsBest(items, W, H, rot, useFill) {
+	let best = null;
+	const consider = (placed, unplaced) => {
+		const off = largestEmptyRect(placed, W, H);
+		const score = [placed.length, off ? offcutScore(off, W, H) : 0];
+		if (!best || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) best = { placed, unplaced, score };
+	};
+	for (const cmp of SORTS) {
+		const r = pack([...items].sort(cmp), W, H, rot);
+		const tl = clone(r.placed); slide(tl, "x", false); slide(tl, "y", false); slide(tl, "x", false);
+		const tr = clone(r.placed); slide(tr, "x", true, W); slide(tr, "y", false); slide(tr, "x", true, W);
+		for (let v of [tl, tr, r.placed]) {
+			if (useFill) { v = clone(v); gapFill(v, W, H); slide(v, "x", false); slide(v, "y", false); }
+			consider(v, r.unplaced);
+		}
+	}
+	return best;
+}
+
+// Randomized multi-restart search: try many orderings, compact each toward the top, keep the best offcut.
+// For ~10 pieces this explores enough of the space to rival hand-tuned layouts.
+function searchBest(items, W, H, rot, iters) {
+	let best = null;
+	const consider = (placed, unplaced) => {
+		const off = largestEmptyRect(placed, W, H);
+		const score = [placed.length, off ? offcutScore(off, W, H) : 0];
+		if (!best || score[0] > best.score[0] || (score[0] === best.score[0] && score[1] > best.score[1])) best = { placed, unplaced, score };
+	};
+	const seed = maxrectsBest(items, W, H, rot, true); // start from the deterministic best
+	consider(seed.placed, seed.unplaced);
+	for (let n = 0; n < iters; n++) {
+		const arr = [...items];
+		for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+		const r = pack(arr, W, H, rot);
+		const v = clone(r.placed); slide(v, "y", false); slide(v, "x", false); slide(v, "y", false);
+		consider(v, r.unplaced);
+	}
+	if (best) { // refine the winner with a gap-fill pass
+		const v = clone(best.placed); gapFill(v, W, H); slide(v, "y", false); slide(v, "x", false);
+		consider(v, best.unplaced);
+	}
+	return best;
+}
+
+// Shelf packer: rows top-down — leaves a clean full-width strip at the bottom.
+function shelfPack(items, W, H, rot) {
+	const order = [...items].sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h);
+	const placed = [], unplaced = [];
+	let x = 0, y = 0, rowH = 0;
+	for (const it of order) {
+		const os = orients(it, rot).filter(o => o.w <= W + 1e-9);
+		if (!os.length) { unplaced.push(it); continue; }
+		const o = os.reduce((m, c) => c.h < m.h ? c : m); // lay flat
+		if (x + o.w > W + 1e-9) { y += rowH; x = 0; rowH = 0; }
+		if (y + o.h > H + 1e-9) { unplaced.push(it); continue; }
+		placed.push(mkNode(it, x, y, o)); x += o.w; rowH = Math.max(rowH, o.h);
+	}
+	return { placed, unplaced };
+}
+
+// Column packer: columns left-to-right — leaves a clean full-height strip on the side.
+function columnPack(items, W, H, rot) {
+	const order = [...items].sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h);
+	const placed = [], unplaced = [];
+	let x = 0, y = 0, colW = 0;
+	for (const it of order) {
+		const os = orients(it, rot).filter(o => o.h <= H + 1e-9);
+		if (!os.length) { unplaced.push(it); continue; }
+		const o = os.reduce((m, c) => c.w < m.w ? c : m); // stand narrow
+		if (y + o.h > H + 1e-9) { x += colW; y = 0; colW = 0; }
+		if (x + o.w > W + 1e-9) { unplaced.push(it); continue; }
+		placed.push(mkNode(it, x, y, o)); y += o.h; colW = Math.max(colW, o.w);
+	}
+	return { placed, unplaced };
+}
+
+function run() {
+	const W = Math.max(0.0001, parseFloat($("cw").value) || 1);
+	let H = Math.max(0.0001, parseFloat($("ch").value) || 1);
+	const allowRotate = $("rotate").checked;
+	const grow = $("grow").checked;
+	const kerf = $("usekerf").checked ? Math.max(0, parseFloat($("kerf").value) || 0) : 0;
+
+	// expand quantities into individual items; footprint (w/h) includes kerf, real size kept as rw/rh
+	let items = [];
+	boxes.forEach((b, gi) => {
+		for (let q = 0; q < b.qty; q++) items.push({ w: b.w + kerf, h: b.h + kerf, rw: b.w, rh: b.h, color: palette[gi % palette.length], label: `${b.w}×${b.h}` });
+	});
+
+	if (grow) {
+		H = parseFloat($("ch").value) || 1;
+		for (let tries = 0; tries < 60; tries++) {
+			if (maxrectsBest(items, W, H, allowRotate, true).unplaced.length === 0) break;
+			H = H * 1.25 + 1;
+		}
+		$("ch").value = Math.round(H * 1000) / 1000;
+	}
+
+	const methods = [
+		{ name: "Search", fn: () => searchBest(items, W, H, allowRotate, 5000) },
+		{ name: "Compact", fn: () => maxrectsBest(items, W, H, allowRotate, false) },
+		{ name: "Gap-fill", fn: () => maxrectsBest(items, W, H, allowRotate, true) },
+		{ name: "Rows", fn: () => shelfPack(items, W, H, allowRotate) },
+		{ name: "Columns", fn: () => columnPack(items, W, H, allowRotate) },
+	];
+	candidates = methods.map(m => {
+		const r = m.fn();
+		const off = largestEmptyRect(r.placed, W, H);
+		return { name: m.name, placed: r.placed, unplaced: r.unplaced, offcut: off, score: [r.placed.length, off ? offcutScore(off, W, H) : 0] };
+	}).sort((a, b) => b.score[0] - a.score[0] || b.score[1] - a.score[1]);
+
+	lastTotal = items.length;
+	view.W = W;
+	view.H = H;
+	renderCompare();
+	selectOption(0);
+}
+
+function renderCompare() {
+	const box = $("compare");
+	box.innerHTML = "";
+	candidates.forEach((c, i) => {
+		const card = document.createElement("div");
+		card.className = "card";
+		const cv = document.createElement("canvas");
+		renderLayout(cv, c, view.W, view.H, 180, 240, false);
+		const o = c.offcut;
+		const offTxt = o ? `${+o.w.toFixed(1)}×${+o.h.toFixed(1)}` : "—";
+		const area = o ? Math.round(o.w * o.h) : 0;
+		const used = c.placed.reduce((s, p) => s + p.w * p.h, 0);
+		const fill = ((used / (view.W * view.H)) * 100).toFixed(0);
+		const cap = document.createElement("div");
+		cap.className = "cap";
+		cap.innerHTML = `<b>${c.name}</b><span>offcut ${offTxt} (${area})</span><span>fill ${fill}%${c.unplaced.length ? ` · ${c.unplaced.length} left` : ""}</span>`;
+		card.appendChild(cv);
+		card.appendChild(cap);
+		card.onclick = () => selectOption(i);
+		box.appendChild(card);
+	});
+}
+
+function selectOption(i) {
+	selected = i;
+	const c = candidates[i];
+	lastResult = { placed: clone(c.placed), unplaced: c.unplaced };
+	[...$("compare").children].forEach((el, idx) => el.classList.toggle("active", idx === i));
+	$("msg").textContent = c.unplaced.length ? `${c.unplaced.length} box(es) didn't fit — enlarge the container or enable auto-grow.` : "";
+	refresh();
+}
+
+// Recompute offcut + stats and redraw from current state (used after packing and manual edits).
+function refresh() {
+	if (!lastResult) return;
+	const W = view.W, H = view.H;
+	lastResult.offcut = largestEmptyRect(lastResult.placed, W, H);
+	draw(lastResult, W, H);
+	const usedArea = lastResult.placed.reduce((s, p) => s + p.w * p.h, 0);
+	const eff = ((usedArea / (W * H)) * 100).toFixed(1);
+	const o = lastResult.offcut;
+	const offTxt = o ? ` &nbsp;·&nbsp; Largest offcut <b>${+o.w.toFixed(2)}×${+o.h.toFixed(2)}</b>` : "";
+	$("stats").innerHTML = `Placed <b>${lastResult.placed.length}</b> / ${lastTotal} &nbsp;·&nbsp; Container <b>${W}×${H}</b> &nbsp;·&nbsp; Fill <b>${eff}%</b>${offTxt}`;
+}
+
+// Render a layout into any canvas; returns the scale used.
+function renderLayout(canvas, result, W, H, maxW, maxH, labels) {
+	const scale = Math.min(maxW / W, maxH / H, 4);
+	canvas.width = W * scale;
+	canvas.height = H * scale;
+	const ctx = canvas.getContext("2d");
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	for (const p of result.placed) {
+		const x = p.x * scale, y = p.y * scale, w = (p.rw ?? p.w) * scale, h = (p.rh ?? p.h) * scale;
+		ctx.fillStyle = p.color + "cc";
+		ctx.fillRect(x, y, w, h);
+		ctx.strokeStyle = "#0d0f14";
+		ctx.lineWidth = 1;
+		ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+		if (labels && w > 30 && h > 16) {
+			ctx.fillStyle = "#fff";
+			ctx.font = "11px system-ui";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(p.label + (p.rot ? " ⟳" : ""), x + w / 2, y + h / 2);
+		}
+	}
+
+	const o = result.offcut;
+	if (o && o.w > 0 && o.h > 0) {
+		const x = o.x * scale, y = o.y * scale, w = o.w * scale, h = o.h * scale;
+		ctx.fillStyle = "rgba(255,255,255,0.06)";
+		ctx.fillRect(x, y, w, h);
+		ctx.strokeStyle = "#3ddc84";
+		ctx.lineWidth = 2;
+		ctx.setLineDash([6, 4]);
+		ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+		ctx.setLineDash([]);
+		if (labels && w > 40 && h > 18) {
+			ctx.fillStyle = "#3ddc84";
+			ctx.font = "bold 12px system-ui";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(`offcut ${+o.w.toFixed(1)}×${+o.h.toFixed(1)}`, x + w / 2, y + h / 2);
+		}
+	}
+	return scale;
+}
+
+// Main editable canvas.
+function draw(result, W, H) {
+	const maxW = Math.min(900, window.innerWidth - 380);
+	const maxH = window.innerHeight - 320;
+	view.scale = renderLayout($("cv"), result, W, H, maxW, maxH, true);
+	view.W = W;
+	view.H = H;
+}
+
+$("loadJson").onclick = () => {
+	try {
+		const data = JSON.parse($("json").value);
+		if (data.container) {
+			if (data.container.w != null) $("cw").value = data.container.w;
+			if (data.container.h != null) $("ch").value = data.container.h;
+		}
+		if (Array.isArray(data.boxes)) {
+			boxes = data.boxes.map(b => ({ w: +b.w || 1, h: +b.h || 1, qty: Math.max(1, parseInt(b.qty) || 1) }));
+		}
+		renderRows();
+		run();
+		$("msg").textContent = "";
+	} catch (e) {
+		$("msg").textContent = "Invalid JSON: " + e.message;
+	}
+};
+
+$("copyJson").onclick = () => {
+	const data = {
+		container: { w: parseFloat($("cw").value) || 0, h: parseFloat($("ch").value) || 0 },
+		boxes: boxes.map(b => ({ w: b.w, h: b.h, qty: b.qty })),
+	};
+	const str = JSON.stringify(data, null, 2);
+	$("json").value = str;
+	navigator.clipboard?.writeText(str);
+};
+
+// ---- manual move / rotate on the canvas ----
+const cv = $("cv");
+let drag = null;
+
+function pickBox(e) {
+	const rect = cv.getBoundingClientRect();
+	const mx = (e.clientX - rect.left) / view.scale, my = (e.clientY - rect.top) / view.scale;
+	if (!lastResult) return { mx, my, p: null };
+	for (let i = lastResult.placed.length - 1; i >= 0; i--) {
+		const p = lastResult.placed[i];
+		const w = p.rw ?? p.w, h = p.rh ?? p.h;
+		if (mx >= p.x && mx <= p.x + w && my >= p.y && my <= p.y + h) return { mx, my, p };
+	}
+	return { mx, my, p: null };
+}
+
+cv.addEventListener("mousedown", e => {
+	const { mx, my, p } = pickBox(e);
+	if (p) { drag = { p, ox: mx - p.x, oy: my - p.y }; cv.style.cursor = "grabbing"; }
+});
+
+window.addEventListener("mousemove", e => {
+	if (!drag) {
+		cv.style.cursor = pickBox(e).p ? "grab" : "default";
+		return;
+	}
+	const rect = cv.getBoundingClientRect();
+	const p = drag.p, W = view.W, H = view.H;
+	let nx = (e.clientX - rect.left) / view.scale - drag.ox;
+	let ny = (e.clientY - rect.top) / view.scale - drag.oy;
+	nx = Math.max(0, Math.min(nx, W - p.w));
+	ny = Math.max(0, Math.min(ny, H - p.h));
+	// snap to walls and to other pieces' edges
+	const th = 6 / view.scale;
+	const xc = [0, W - p.w], yc = [0, H - p.h];
+	for (const q of lastResult.placed) {
+		if (q === p) continue;
+		xc.push(q.x, q.x - p.w, q.x + q.w, q.x + q.w - p.w);
+		yc.push(q.y, q.y - p.h, q.y + q.h, q.y + q.h - p.h);
+	}
+	for (const c of xc) if (Math.abs(nx - c) < th) { nx = c; break; }
+	for (const c of yc) if (Math.abs(ny - c) < th) { ny = c; break; }
+	p.x = Math.max(0, Math.min(nx, W - p.w));
+	p.y = Math.max(0, Math.min(ny, H - p.h));
+	refresh();
+});
+
+window.addEventListener("mouseup", () => { if (drag) { drag = null; cv.style.cursor = "grab"; } });
+
+cv.addEventListener("dblclick", e => {
+	const { p } = pickBox(e);
+	if (!p) return;
+	[p.w, p.h] = [p.h, p.w];
+	if (p.rw != null) [p.rw, p.rh] = [p.rh, p.rw];
+	p.rot = !p.rot;
+	p.x = Math.max(0, Math.min(p.x, view.W - p.w));
+	p.y = Math.max(0, Math.min(p.y, view.H - p.h));
+	refresh();
+});
+
+$("pack").onclick = run;
+window.addEventListener("resize", () => run());
+renderRows();
+run();
+</script>
+</body>
+</html>

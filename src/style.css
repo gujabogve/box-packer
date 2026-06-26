@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-surface: #0f1115;
+	--color-panel: #171a21;
+	--color-line: #2a2f3a;
+	--color-ink: #e6e9ef;
+	--color-muted: #8b93a3;
+	--color-accent: #4f9dff;
+}
+
+html,
+body,
+#app {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	font-family: system-ui, sans-serif;
+	background: var(--color-surface);
+	color: var(--color-ink);
+	/* respect iOS safe areas when installed as a PWA */
+	overscroll-behavior: none;
+}

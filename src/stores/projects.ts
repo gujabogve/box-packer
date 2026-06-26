@@ -1,0 +1,131 @@
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
+import { db } from '../db';
+import { defaultOptions, type Project, type Sheet } from '../lib/types';
+
+function uid(): string {
+	return crypto.randomUUID();
+}
+
+// Strip Vue reactivity to a plain structured-cloneable object before persisting.
+function snapshot<T>(value: T): T {
+	return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export const useProjectsStore = defineStore('projects', () => {
+	const projects = ref<Project[]>([]);
+	const activeId = ref<string | null>(null);
+	const loaded = ref(false);
+
+	const activeProject = computed(() => projects.value.find((p) => p.id === activeId.value) ?? null);
+
+	async function load(): Promise<void> {
+		projects.value = await db.projects.orderBy('updatedAt').reverse().toArray();
+		loaded.value = true;
+		if (!activeId.value && projects.value.length) activeId.value = projects.value[0].id;
+	}
+
+	async function persist(id: string): Promise<void> {
+		const p = projects.value.find((x) => x.id === id);
+		if (!p) return;
+		p.updatedAt = Date.now();
+		await db.projects.put(snapshot(p));
+	}
+
+	function setActive(id: string): void {
+		activeId.value = id;
+	}
+
+	async function createProject(name: string): Promise<Project> {
+		const p: Project = {
+			id: uid(),
+			name: name.trim() || 'Untitled',
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			sheets: [],
+		};
+		projects.value.unshift(p);
+		activeId.value = p.id;
+		await db.projects.put(snapshot(p));
+		return p;
+	}
+
+	async function renameProject(id: string, name: string): Promise<void> {
+		const p = projects.value.find((x) => x.id === id);
+		if (!p) return;
+		p.name = name.trim() || p.name;
+		await persist(id);
+	}
+
+	async function deleteProject(id: string): Promise<void> {
+		projects.value = projects.value.filter((p) => p.id !== id);
+		if (activeId.value === id) activeId.value = projects.value[0]?.id ?? null;
+		await db.projects.delete(id);
+	}
+
+	async function addSheet(projectId: string, init: Partial<Sheet> = {}): Promise<Sheet | null> {
+		const p = projects.value.find((x) => x.id === projectId);
+		if (!p) return null;
+		const sheet: Sheet = {
+			id: uid(),
+			name: init.name ?? `Sheet ${p.sheets.length + 1}`,
+			container: init.container ?? { w: 122, h: 244 },
+			thickness: init.thickness ?? 15,
+			options: init.options ?? defaultOptions(),
+			pieces: init.pieces ?? [],
+			savedLayout: init.savedLayout ?? null,
+			savedMethod: init.savedMethod ?? null,
+		};
+		p.sheets.push(sheet);
+		await persist(projectId);
+		return sheet;
+	}
+
+	async function deleteSheet(projectId: string, sheetId: string): Promise<void> {
+		const p = projects.value.find((x) => x.id === projectId);
+		if (!p) return;
+		p.sheets = p.sheets.filter((s) => s.id !== sheetId);
+		await persist(projectId);
+	}
+
+	function getSheet(projectId: string, sheetId: string): Sheet | null {
+		const p = projects.value.find((x) => x.id === projectId);
+		return p?.sheets.find((s) => s.id === sheetId) ?? null;
+	}
+
+	async function exportAll(): Promise<string> {
+		return JSON.stringify({ version: 1, projects: snapshot(projects.value) }, null, 2);
+	}
+
+	async function importAll(json: string): Promise<void> {
+		const data = JSON.parse(json) as { projects?: Project[] };
+		const incoming = Array.isArray(data.projects) ? data.projects : [];
+		await db.projects.bulkPut(incoming.map((p) => snapshot(p)));
+		await load();
+	}
+
+	async function clearAll(): Promise<void> {
+		await db.projects.clear();
+		projects.value = [];
+		activeId.value = null;
+	}
+
+	return {
+		projects,
+		activeId,
+		activeProject,
+		loaded,
+		load,
+		persist,
+		setActive,
+		createProject,
+		renameProject,
+		deleteProject,
+		addSheet,
+		deleteSheet,
+		getSheet,
+		exportAll,
+		importAll,
+		clearAll,
+	};
+});
